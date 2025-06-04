@@ -2,6 +2,9 @@ import streamlit as st
 from providers.huggingface import load_huggingface_model
 from utils.fetch_hf_models import fetch_huggingface_models, fetch_huggingface_embedding_models
 from utils.fetch_ollama_models import fetch_ollama_llm_models
+from data_load.load_csv import load_csv, load_unstructured_csv
+from data_load.load_pdf import load_pdf
+import tempfile
 
 st.title("Retrieval Augmented Generation Project")
 
@@ -37,23 +40,12 @@ model_option = st.sidebar.selectbox(
     )
 )
 
-data_option = st.sidebar.selectbox(
-    "Select the type of data",
-    (
-        "PDF files",
-        "Videos",
-        "Images",
-        "CSV files",
-        "Github Repository",
-        "Unstructured CSV",
-        "Code files"
-    )
-)
-
 hf_model_name = None
 custom_hf_model_name = None
 show_custom_hf_input = False
 
+loaded_hf_model = None
+loaded_hf_tokenizer = None
 if model_option == "Huggingface":
     if "hf_model_names" not in st.session_state:
         with st.sidebar:
@@ -75,7 +67,6 @@ if model_option == "Huggingface":
             )
             if custom_hf_model_name:
                 hf_model_name = custom_hf_model_name
-        st.sidebar.markdown("---")
     else:
         st.sidebar.warning("Could not fetch Huggingface models.")
         if "show_custom_hf_input" not in st.session_state:
@@ -87,11 +78,32 @@ if model_option == "Huggingface":
             if custom_hf_model_name:
                 hf_model_name = custom_hf_model_name
 
+    if st.sidebar.button("Load Model"):
+        with st.spinner(f"Loading Huggingface model: {hf_model_name} ..."):
+            loaded_hf_tokenizer, loaded_hf_model = load_huggingface_model(hf_model_name)
+        st.sidebar.success(f"Model '{hf_model_name}' loaded successfully!")
+
 embedding_model_name = None
 custom_embedding_model_name = None
 show_custom_embedding_input = False
 
 if task_option == "Retrieval Augmented Generation":
+
+    data_option = st.sidebar.selectbox(
+        "Select the type of data",
+        (
+            "PDF files",
+            "Videos",
+            "Youtube Video",
+            "Images",
+            "CSV files",
+            "Github Repository",
+            "Unstructured CSV",
+            "JSON files",
+            "Code files"
+        )
+    )
+
     if model_option == "Huggingface":
         if "hf_embedding_models" not in st.session_state:
             with st.sidebar:
@@ -125,8 +137,69 @@ if task_option == "Retrieval Augmented Generation":
                 if custom_embedding_model_name:
                     embedding_model_name = custom_embedding_model_name
 
+    if data_option == "PDF files":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Upload PDF File")
+        pdf_file = st.sidebar.file_uploader(
+            "Upload your PDF file",
+            type=["pdf"]
+        )
+        if pdf_file is not None:
+            st.write(f"PDF file upload: **{pdf_file.name}**")
+            with st.spinner("Loading PDF files..."):
+                # Save uploaded file to a temporary file and pass its path
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(pdf_file.read())
+                    tmp_file_path = tmp_file.name
+                pdf_data = load_pdf(tmp_file_path)
+            st.success("Successfully loaded PDF data")
+            st.write(pdf_data)
+
+    if data_option == "Images":
+        st.sidebar.markdown("---")
+        st.sidebar.header("Upload Image File")
+        image_file = st.sidebar.file_uploader(
+            "Upload your image file",
+            type=["png", "jpg", "jpeg", "bmp", "gif"]
+        )
+        if image_file is not None:
+            st.write(f"Image file uploaded: **{image_file.name}**")
+
+    if data_option == "CSV files" or data_option == "Unstructured CSV":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Upload CSV file")
+        csv_file = st.sidebar.file_uploader(
+            "Upload your CSV file",
+            type=["csv"]
+        )
+        if csv_file is not None:
+            st.write(f"CSV file uploaded: **{csv_file.name}**")
+
+    if data_option == "Unstructured CSV":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Upload CSV file")
+        csv_file = st.sidebar.file_uploader(
+            "Upload your Unstructured CSV file",
+            type=["csv"]
+        )
+        if csv_file is not None:
+            st.write(f"CSV file uploaded: **{csv_file.name}**")
+            with st.spinner("Loading Unstructured CSV file..."):
+                csv_data = load_unstructured_csv(csv_file)
+            st.success("Unstructured CSV file loaded successfully.")
+            st.write(csv_data)
+
+    if data_option == "JSON files":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Upload JSON File")
+        json_file = st.sidebar.file_uploader(
+            "Upload your JSON file",
+            type=["json"]
+        )
+        if json_file is not None:
+            st.write(f"JSON file uploaded: **{json_file.name}**")
+
 if task_option == "Fine Tuning":
-    st.sidebar.markdown("---")
     st.sidebar.subheader("Fine Tuning Dataset")
     fine_tune_dataset = st.sidebar.file_uploader(
         "Upload your fine tuning dataset (CSV, JSON, JSONL, TXT)",
