@@ -1,8 +1,7 @@
 import streamlit as st
-from providers.huggingface import load_huggingface_model
+from providers.huggingface import load_huggingface_model, load_huggingface_embedding
 from utils.fetch_hf_models import fetch_huggingface_models, fetch_huggingface_embedding_models
-from utils.fetch_ollama_models import fetch_ollama_llm_models
-from data_load.load_csv import load_csv, load_unstructured_csv
+from data_load.load_csv import load_unstructured_csv
 from data_load.load_pdf import load_pdf
 import tempfile
 
@@ -79,9 +78,12 @@ if model_option == "Huggingface":
                 hf_model_name = custom_hf_model_name
 
     if st.sidebar.button("Load Model"):
-        with st.spinner(f"Loading Huggingface model: {hf_model_name} ..."):
-            loaded_hf_tokenizer, loaded_hf_model = load_huggingface_model(hf_model_name)
-        st.sidebar.success(f"Model '{hf_model_name}' loaded successfully!")
+        if isinstance(hf_model_name, str) and hf_model_name.strip():
+            with st.spinner(f"Loading Huggingface model: {hf_model_name} ..."):
+                loaded_hf_tokenizer, loaded_hf_model = load_huggingface_model(hf_model_name)
+            st.sidebar.success(f"Model '{hf_model_name}' loaded successfully!")
+        else:
+            st.sidebar.error("Please select or enter a valid Huggingface model name before loading.")
 
 embedding_model_name = None
 custom_embedding_model_name = None
@@ -100,7 +102,20 @@ if task_option == "Retrieval Augmented Generation":
             "Github Repository",
             "Unstructured CSV",
             "JSON files",
-            "Code files"
+            "Code files",
+            "Tweets",
+            "Reddit",
+            "Google Drive",
+            "Whatsapp Messages",
+            "Telegram"
+        )
+    )
+
+    rag_type_option = st.sidebar.selectbox(
+        "Select the type of RAG to perform on the data",
+        (
+            "Simple RAG",
+            "Graph RAG",
         )
     )
 
@@ -198,6 +213,13 @@ if task_option == "Retrieval Augmented Generation":
         )
         if json_file is not None:
             st.write(f"JSON file uploaded: **{json_file.name}**")
+
+    user_query = st.text_input("Enter your text query:", key="rag_query")
+    if user_query:
+        st.write(f"Your query: {user_query}")
+
+    memory_enabled = st.sidebar.toggle("Memory", value=False)
+    st.write(f"Memory Enabled: {memory_enabled}")
 
 if task_option == "Fine Tuning":
     st.sidebar.subheader("Fine Tuning Dataset")
