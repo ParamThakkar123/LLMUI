@@ -3,6 +3,7 @@ from providers.huggingface import load_huggingface_model, load_huggingface_embed
 from utils.fetch_hf_models import fetch_huggingface_models, fetch_huggingface_embedding_models
 from data_load.load_csv import load_unstructured_csv
 from data_load.load_pdf import load_pdf
+from rag_type.simple_rag import perform_simple_rag
 import tempfile
 
 st.title("Retrieval Augmented Generation Project")
@@ -107,7 +108,8 @@ if task_option == "Retrieval Augmented Generation":
             "Reddit",
             "Google Drive",
             "Whatsapp Messages",
-            "Telegram"
+            "Telegram",
+            "Markdown Files"
         )
     )
 
@@ -118,6 +120,46 @@ if task_option == "Retrieval Augmented Generation":
             "Graph RAG",
         )
     )
+
+    vector_db_option = st.sidebar.selectbox(
+        "Select the vector database you want to use",
+        (
+            "Qdrant",
+            "Milvus",
+            "Chroma",
+            "FAISS"
+        )
+    )
+
+    if data_option == "PDF files":
+        splitter_option = st.sidebar.selectbox(
+            "Select Splitter Type",
+            (
+                "Character Text Splitter",
+                "Recursive Character Text Splitter",
+            )
+        )
+
+    chunk_size = st.sidebar.number_input(
+        "Enter chunk size for RAG",
+        min_value=1,
+        max_value=10000,
+        value=1000,
+        step=1,
+        key="chunk_size"
+    )
+
+    chunk_overlap = st.sidebar.number_input(
+        "Enter chunk overlap for RAG",
+        min_value=0,
+        max_value=10000,
+        value=200,
+        step=1,
+        key="chunk_overlap"
+    )
+
+    memory_enabled = st.sidebar.toggle("Memory", value=False)
+    st.write(f"Memory Enabled: {memory_enabled}")
 
     if model_option == "Huggingface":
         if "hf_embedding_models" not in st.session_state:
@@ -141,6 +183,14 @@ if task_option == "Retrieval Augmented Generation":
                 )
                 if custom_embedding_model_name:
                     embedding_model_name = custom_embedding_model_name
+            
+            if st.sidebar.button("Load Embedding Model"):
+                if isinstance(embedding_model_name, str) and embedding_model_name.strip():
+                    with st.spinner(f"Loading Huggingface embedding model: {embedding_model_name} ..."):
+                        loaded_embedding_model = load_huggingface_embedding(embedding_model_name)
+                    st.sidebar.success(f"Embedding model '{embedding_model_name}' loaded successfully!")
+                else:
+                    st.sidebar.error("Please select or enter a valid Huggingface embedding model name before loading.")
         else:
             st.sidebar.warning("Could not fetch Huggingface embedding models.")
             if "show_custom_embedding_input" not in st.session_state:
@@ -151,6 +201,13 @@ if task_option == "Retrieval Augmented Generation":
                 )
                 if custom_embedding_model_name:
                     embedding_model_name = custom_embedding_model_name
+            if st.sidebar.button("Load Embedding Model"):
+                if isinstance(embedding_model_name, str) and embedding_model_name.strip():
+                    with st.spinner(f"Loading Huggingface embedding model: {embedding_model_name} ..."):
+                        loaded_embedding_model = load_huggingface_embedding(embedding_model_name)
+                    st.sidebar.success(f"Embedding model '{embedding_model_name}' loaded successfully!")
+                else:
+                    st.sidebar.error("Please select or enter a valid Huggingface embedding model name before loading.")
 
     if data_option == "PDF files":
         st.sidebar.markdown("---")
@@ -162,7 +219,6 @@ if task_option == "Retrieval Augmented Generation":
         if pdf_file is not None:
             st.write(f"PDF file upload: **{pdf_file.name}**")
             with st.spinner("Loading PDF files..."):
-                # Save uploaded file to a temporary file and pass its path
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                     tmp_file.write(pdf_file.read())
                     tmp_file_path = tmp_file.name
@@ -216,10 +272,16 @@ if task_option == "Retrieval Augmented Generation":
 
     user_query = st.text_input("Enter your text query:", key="rag_query")
     if user_query:
-        st.write(f"Your query: {user_query}")
-
-    memory_enabled = st.sidebar.toggle("Memory", value=False)
-    st.write(f"Memory Enabled: {memory_enabled}")
+        if rag_type_option == "Simple RAG":
+            perform_simple_rag(
+                llm=loaded_hf_model, 
+                embedding=loaded_embedding_model,
+                data=pdf_data,
+                query=user_query,
+                splittertype=splitter_option,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap
+            )
 
 if task_option == "Fine Tuning":
     st.sidebar.subheader("Fine Tuning Dataset")
