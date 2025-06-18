@@ -5,6 +5,10 @@ from data_load.load_csv import load_unstructured_csv
 from data_load.load_pdf import load_pdf
 from rag_type.simple_rag import perform_simple_rag
 import tempfile
+from langchain_community.embeddings import HuggingFaceEmbeddings
+import torch
+from langchain_huggingface.chat_models import ChatHuggingFace
+from langchain_huggingface import HuggingFacePipeline
 
 st.title("Retrieval Augmented Generation Project")
 
@@ -46,6 +50,7 @@ show_custom_hf_input = False
 
 loaded_hf_model = None
 loaded_hf_tokenizer = None
+loaded_embedding_model = None
 if model_option == "Huggingface":
     if "hf_model_names" not in st.session_state:
         with st.sidebar:
@@ -187,7 +192,8 @@ if task_option == "Retrieval Augmented Generation":
             if st.sidebar.button("Load Embedding Model"):
                 if isinstance(embedding_model_name, str) and embedding_model_name.strip():
                     with st.spinner(f"Loading Huggingface embedding model: {embedding_model_name} ..."):
-                        loaded_embedding_model = load_huggingface_embedding(embedding_model_name)
+                        # loaded_embedding_model = load_huggingface_embedding(embedding_model_name)
+                        loaded_embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
                     st.sidebar.success(f"Embedding model '{embedding_model_name}' loaded successfully!")
                 else:
                     st.sidebar.error("Please select or enter a valid Huggingface embedding model name before loading.")
@@ -273,15 +279,30 @@ if task_option == "Retrieval Augmented Generation":
     user_query = st.text_input("Enter your text query:", key="rag_query")
     if user_query:
         if rag_type_option == "Simple RAG":
-            perform_simple_rag(
-                llm=loaded_hf_model, 
-                embedding=loaded_embedding_model,
+            # Initialize chat model and embedding model objects
+            chat_model = None
+            embedding_model = None
+            if model_option == "Huggingface" and hf_model_name:
+                llm_pipeline = HuggingFacePipeline.from_model_id(
+                    model_id=hf_model_name,
+                    task="text-generation",
+                    pipeline_kwargs={"max_new_tokens": 100},
+                    device=0 if torch.cuda.is_available() else -1,
+                )
+                # Initialize ChatHuggingFace with the pipeline
+                chat_model = ChatHuggingFace(llm=llm_pipeline)
+            if embedding_model_name:
+                embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
+            result = perform_simple_rag(
+                llm=chat_model, 
+                embedding=embedding_model_name,
                 data=pdf_data,
                 query=user_query,
                 splittertype=splitter_option,
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap
             )
+            st.write(result)
 
 if task_option == "Fine Tuning":
     st.sidebar.subheader("Fine Tuning Dataset")
@@ -291,9 +312,3 @@ if task_option == "Fine Tuning":
     )
     if fine_tune_dataset is not None:
         st.write(f"Fine tuning dataset uploaded: **{fine_tune_dataset.name}**")
-
-st.write(f"Selected Model Provider: **{model_option}**")
-if model_option == "Huggingface" and hf_model_name:
-    st.write(f"Selected Huggingface Model: **{hf_model_name}**")
-if task_option == "Retrieval Augmented Generation" and embedding_model_name:
-    st.write(f"Selected Embedding Model: **{embedding_model_name}**")

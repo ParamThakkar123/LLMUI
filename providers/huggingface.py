@@ -1,5 +1,5 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from sentence_transformers import SentenceTransformer
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 def load_huggingface_model(model: str):
     tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
@@ -7,5 +7,5 @@ def load_huggingface_model(model: str):
     return tokenizer, model
 
 def load_huggingface_embedding(model: str):
-    model = SentenceTransformer(model)
+    model = HuggingFaceEmbeddings(model)
     return model
