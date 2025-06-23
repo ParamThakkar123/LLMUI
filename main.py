@@ -9,6 +9,8 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 import torch
 from langchain_huggingface.chat_models import ChatHuggingFace
 from langchain_huggingface import HuggingFacePipeline
+from tools.web_search import web_search_tool
+from rag_type.agentic_rag import create_agent, run_agent
 
 st.title("Retrieval Augmented Generation Project")
 
@@ -22,7 +24,8 @@ task_option = st.sidebar.selectbox(
         "Fine Tuning",
         "LLM inference optimization",
         "Agentic AI",
-        "Multi agent use case"
+        "Multi agent use case",
+        "Knowledge Graph Visualization"
     )
 )
 
@@ -302,7 +305,7 @@ if task_option == "Retrieval Augmented Generation":
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap
             )
-            st.write(result)
+            st.write(result.result)
 
 if task_option == "Fine Tuning":
     st.sidebar.subheader("Fine Tuning Dataset")
@@ -312,3 +315,80 @@ if task_option == "Fine Tuning":
     )
     if fine_tune_dataset is not None:
         st.write(f"Fine tuning dataset uploaded: **{fine_tune_dataset.name}**")
+
+if task_option == "Agentic AI":
+    st.sidebar.subheader("Agentic AI Configuration")
+
+    agent_name = st.sidebar.text_input(
+        "Enter the name of the agent",
+        value="Agent"
+    )
+
+    agent_description = st.sidebar.text_area(
+        "Enter a description for the agent",
+        placeholder="This agent is designed to perform various tasks."
+    )
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Add Tool")
+
+    # Define available tools
+    available_tools = ["Web Search"]
+
+    selected_tool = st.sidebar.selectbox("Select Tool", available_tools, key="tool_select")
+    tool_description = st.sidebar.text_area("Tool Description", key="tool_description")
+
+    serper_api_key = None
+    if selected_tool.lower() == "web search":
+        serper_api_key = st.sidebar.text_input("SERPER API Key", type="password", key="serper_api_key")
+
+    if "agent_tools" not in st.session_state:
+        st.session_state.agent_tools = []
+
+    if st.sidebar.button("Add Tool"):
+        if selected_tool and tool_description:
+            if selected_tool.lower() == "web search":
+                if not serper_api_key:
+                    st.sidebar.error("Please provide the SERPER API key for the web search tool.")
+                else:
+                    st.session_state.agent_tools.append(web_search_tool(serper_api_key=serper_api_key))
+                    st.sidebar.success(f"Tool {selected_tool} Added")
+            else:
+                st.session_state.agent_tools.append({
+                    "name": selected_tool,
+                    "description": tool_description
+                })
+                st.sidebar.success(f"Tool {selected_tool} Added")
+        else:
+            st.sidebar.error("Please provide a tool and a tool description.")
+
+    prompt = st.sidebar.text_input("Enter a prompt for the agent", placeholder="Enter a prompt for the agent")
+    agent = None
+    if st.sidebar.button("Create Agent"):
+        model_id = hf_model_name if model_option.lower() == "huggingface" else None
+        model_provider = model_option.lower()
+        tools = st.session_state.agent_tools
+        if not model_id:
+            st.sidebar.error("Please select a model for the agent.")
+        elif not prompt:
+            st.sidebar.error("Please enter a prompt for the agent.")
+        else:
+            agent = create_agent(
+                model_id=model_id,
+                model_provider=model_provider,
+                tools=tools,
+                prompt=prompt
+            )
+            st.success("Agent created successfully!")
+
+    st.markdown("---")
+    agent_query = st.text_input("Ask your AI Agent a question:", key="agent_query_input")
+    if st.button("Send to Agent"):
+        if "agent" in locals() or "agent" in globals():
+            response = run_agent(agent, agent_query)
+            st.write(response)
+        else:
+            st.warning("Please create an agent first using the sidebar options.")
+
+if task_option == "Knowledge Graph Visualization":
+    pass

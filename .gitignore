@@ -3,3 +3,4 @@ db
 utils/__pycache__/*
 utils/__pycache__
 utils/__pycache__/fetch_hf_models.cpython-312.pyc
+.continue
