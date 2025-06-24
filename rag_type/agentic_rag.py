@@ -16,5 +16,7 @@ def run_agent(agent, query: str):
         stream_mode="values"
     )
 
+    last_message = None
     for event in events:
-        print(event["messages"][-1])
+        last_message = event["messages"][-1]
+    return last_message

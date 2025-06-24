@@ -11,6 +11,7 @@ from langchain_huggingface.chat_models import ChatHuggingFace
 from langchain_huggingface import HuggingFacePipeline
 from tools.web_search import web_search_tool
 from rag_type.agentic_rag import create_agent, run_agent
+from utils.fetch_ollama_models import fetch_ollama_llm_models
 
 st.title("Retrieval Augmented Generation Project")
 
@@ -51,9 +52,12 @@ hf_model_name = None
 custom_hf_model_name = None
 show_custom_hf_input = False
 
+ollama_model_name = None
+
 loaded_hf_model = None
 loaded_hf_tokenizer = None
 loaded_embedding_model = None
+
 if model_option == "Huggingface":
     if "hf_model_names" not in st.session_state:
         with st.sidebar:
@@ -93,6 +97,21 @@ if model_option == "Huggingface":
             st.sidebar.success(f"Model '{hf_model_name}' loaded successfully!")
         else:
             st.sidebar.error("Please select or enter a valid Huggingface model name before loading.")
+
+elif model_option == "Ollama":
+    if "ollama_model_names" not in st.session_state:
+        with st.sidebar:
+            with st.spinner("Fetching Ollama models..."):
+                llm_models, embedding_models = fetch_ollama_llm_models()
+                st.session_state.ollama_model_names = llm_models
+    ollama_model_names = st.session_state.get("ollama_model_names", [])
+    if ollama_model_names:
+        ollama_model_name = st.sidebar.selectbox(
+            "Select an Ollama Model",
+            ollama_model_names
+        )
+    else:
+        st.sidebar.warning("Could not fetch ollama models")
 
 embedding_model_name = None
 custom_embedding_model_name = None
@@ -363,9 +382,13 @@ if task_option == "Agentic AI":
             st.sidebar.error("Please provide a tool and a tool description.")
 
     prompt = st.sidebar.text_input("Enter a prompt for the agent", placeholder="Enter a prompt for the agent")
-    agent = None
     if st.sidebar.button("Create Agent"):
-        model_id = hf_model_name if model_option.lower() == "huggingface" else None
+        if model_option.lower() == "huggingface":
+            model_id = hf_model_name
+        elif model_option.lower() == "ollama":
+            model_id = ollama_model_name
+        else:
+            model_id = None
         model_provider = model_option.lower()
         tools = st.session_state.agent_tools
         if not model_id:
@@ -379,14 +402,16 @@ if task_option == "Agentic AI":
                 tools=tools,
                 prompt=prompt
             )
+            st.session_state.agent = agent
             st.success("Agent created successfully!")
 
     st.markdown("---")
     agent_query = st.text_input("Ask your AI Agent a question:", key="agent_query_input")
     if st.button("Send to Agent"):
-        if "agent" in locals() or "agent" in globals():
+        agent = st.session_state.get("agent", None)
+        if agent is not None:
             response = run_agent(agent, agent_query)
-            st.write(response)
+            st.write(response.content)
         else:
             st.warning("Please create an agent first using the sidebar options.")
 
