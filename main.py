@@ -11,7 +11,8 @@ from langchain_huggingface.chat_models import ChatHuggingFace
 from langchain_huggingface import HuggingFacePipeline
 from tools.web_search import web_search_tool
 from rag_type.agentic_rag import create_agent, run_agent
-from utils.fetch_ollama_models import fetch_ollama_llm_models
+from utils.fetch_ollama_models import fetch_ollama_llm_models, fetch_ollama_embedding_models
+from providers.ollama import load_ollama_model
 
 st.title("Retrieval Augmented Generation Project")
 
@@ -53,10 +54,12 @@ custom_hf_model_name = None
 show_custom_hf_input = False
 
 ollama_model_name = None
+ollama_embedding_model = None
 
 loaded_hf_model = None
 loaded_hf_tokenizer = None
 loaded_embedding_model = None
+loaded_ollama_model = None
 
 if model_option == "Huggingface":
     if "hf_model_names" not in st.session_state:
@@ -102,7 +105,7 @@ elif model_option == "Ollama":
     if "ollama_model_names" not in st.session_state:
         with st.sidebar:
             with st.spinner("Fetching Ollama models..."):
-                llm_models, embedding_models = fetch_ollama_llm_models()
+                llm_models, _ = fetch_ollama_llm_models()
                 st.session_state.ollama_model_names = llm_models
     ollama_model_names = st.session_state.get("ollama_model_names", [])
     if ollama_model_names:
@@ -113,6 +116,14 @@ elif model_option == "Ollama":
     else:
         st.sidebar.warning("Could not fetch ollama models")
 
+    if st.sidebar.button("Load Ollama Model"):
+        if isinstance(ollama_model_name, str) and ollama_model_name.strip():
+            with st.spinner(f"Loading Huggingface model: {ollama_model_name} ..."):
+                loaded_ollama_model = load_ollama_model(ollama_model_name)
+            st.sidebar.success(f"Model '{ollama_model_name}' loaded successfully!")
+        else:
+            st.sidebar.error("Please select or enter a valid Huggingface model name before loading.")
+        
 embedding_model_name = None
 custom_embedding_model_name = None
 show_custom_embedding_input = False
@@ -236,6 +247,29 @@ if task_option == "Retrieval Augmented Generation":
                     st.sidebar.success(f"Embedding model '{embedding_model_name}' loaded successfully!")
                 else:
                     st.sidebar.error("Please select or enter a valid Huggingface embedding model name before loading.")
+
+    if model_option == "Ollama":
+        if "ollama_embedding_models" not in st.session_state:
+            with st.sidebar:
+                with st.spinner("Fetching Ollama Embedding Models"):
+                    embedding_models = fetch_ollama_embedding_models()
+                    st.session_state.ollama_embedding_models = embedding_models
+            
+        ollama_embedding_models = st.session_state.get("ollama_embedding_models", [])
+        if ollama_embedding_models:
+            ollama_embedding_model = st.sidebar.selectbox(
+                "Select an Ollama Embedding Models",
+                ollama_embedding_models
+            )
+
+            if st.sidebar.button("Load Ollama Embedding Model"):
+                if isinstance(ollama_embedding_model, str) and ollama_embedding_model.strip():
+                    loaded_embedding_model = ollama_embedding_model
+                    st.sidebar.success(f"Ollama embeddding model '{ollama_embedding_model}' loaded sucessfully!")
+                else:
+                    st.sidebar.error("Please select a valid Ollama embedding model.")
+        else:
+            st.sidebar.info("No Ollama embedding models loaded.")
 
     if data_option == "PDF files":
         st.sidebar.markdown("---")

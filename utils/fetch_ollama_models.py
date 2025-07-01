@@ -11,3 +11,14 @@ def fetch_ollama_llm_models(ollama_api_url='http://localhost:11434'):
     except requests.RequestException as e:
         print(f"Error fetching LLM models : {e}")
         return []
+
+def fetch_ollama_embedding_models(ollama_api_url='http://localhost:11434'):
+    try:
+        response = requests.get(f"{ollama_api_url}/api/tags")
+        response.raise_for_status()
+        models = response.json().get("models", [])
+        embedding_models = [model["name"] for model in models if "embed" in model["name"].lower()]
+        return embedding_models
+    except requests.RequestException as e:
+        print(f"Error fetching Ollama embedding models: {e}")
+        return []
