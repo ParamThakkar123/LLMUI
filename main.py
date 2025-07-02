@@ -14,6 +14,8 @@ from rag_type.agentic_rag import create_agent, run_agent
 from utils.fetch_ollama_models import fetch_ollama_llm_models, fetch_ollama_embedding_models
 from providers.ollama import load_ollama_model
 from evals.evals import bleu_score, batch_bleu, bert_score
+from langgraph.checkpoint.memory import MemorySaver
+from langchain_ollama import OllamaEmbeddings
 
 st.title("Retrieval Augmented Generation Project")
 
@@ -259,14 +261,13 @@ if task_option == "Retrieval Augmented Generation":
         ollama_embedding_models = st.session_state.get("ollama_embedding_models", [])
         if ollama_embedding_models:
             ollama_embedding_model = st.sidebar.selectbox(
-                "Select an Ollama Embedding Models",
+                "Select an Ollama Embedding Model",
                 ollama_embedding_models
             )
-
             if st.sidebar.button("Load Ollama Embedding Model"):
                 if isinstance(ollama_embedding_model, str) and ollama_embedding_model.strip():
-                    loaded_embedding_model = ollama_embedding_model
-                    st.sidebar.success(f"Ollama embeddding model '{ollama_embedding_model}' loaded sucessfully!")
+                    embedding_model = OllamaEmbeddings(model=ollama_embedding_model)
+                    st.sidebar.success(f"Ollama embedding model '{ollama_embedding_model}' loaded successfully!")
                 else:
                     st.sidebar.error("Please select a valid Ollama embedding model.")
         else:
@@ -337,7 +338,6 @@ if task_option == "Retrieval Augmented Generation":
     if user_query:
         if rag_type_option == "Simple RAG":
             chat_model = None
-            embedding_model = None
             if model_option == "Huggingface" and hf_model_name:
                 llm_pipeline = HuggingFacePipeline.from_model_id(
                     model_id=hf_model_name,
@@ -346,18 +346,27 @@ if task_option == "Retrieval Augmented Generation":
                     device=0 if torch.cuda.is_available() else -1,
                 )
                 chat_model = ChatHuggingFace(llm=llm_pipeline)
-            if embedding_model_name:
+            elif model_option == "Ollama" and ollama_model_name:
+                chat_model = load_ollama_model(ollama_model_name)
+            
+            # Always set embedding_model based on the selected provider and embedding_model_name
+            embedding_model = None
+            if model_option == "Huggingface" and embedding_model_name:
                 embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
+            elif model_option == "Ollama" and ollama_embedding_model:
+                embedding_model = OllamaEmbeddings(model=ollama_embedding_model)
+
+            # Now you can safely use embedding_model in perform_simple_rag
             result = perform_simple_rag(
-                llm=chat_model, 
-                embedding=embedding_model_name,
+                llm=chat_model,
+                embedding=embedding_model,
                 data=pdf_data,
                 query=user_query,
                 splittertype=splitter_option,
                 chunk_size=chunk_size,
                 chunk_overlap=chunk_overlap
             )
-            st.write(result.result)
+            st.write(result["result"])
 
 if task_option == "Fine Tuning":
     st.sidebar.subheader("Fine Tuning Dataset")
@@ -452,10 +461,18 @@ if task_option == "Knowledge Graph Visualization":
 if task_option == "RAG System Evaluation":
     st.sidebar.subheader("RAG System Evaluation Configuration")
 
+    eval_model_provider = st.sidebar.selectbox(
+        "Select Model Provider for Evaluation",
+        ("Huggingface", "Ollama"),
+        key="eval_model_provider"
+    )
+
     llm_model_name = None
     embedding_model_name = None
+    embedding_model = None
 
-    if model_option == "Huggingface":
+    # LLM selection
+    if eval_model_provider == "Huggingface":
         if "hf_model_names" not in st.session_state:
             with st.spinner("Fetching Huggingface models..."):
                 st.session_state.hf_model_names = fetch_huggingface_models()
@@ -463,7 +480,7 @@ if task_option == "RAG System Evaluation":
         llm_model_name = st.sidebar.selectbox(
             "Select a Huggingface model", model_names, key="eval_hf_llm_model"
         ) if model_names else None
-    elif model_option == "Ollama":
+    elif eval_model_provider == "Ollama":
         if "ollama_model_names" not in st.session_state:
             with st.spinner("Fetching Ollama models..."):
                 llm_models, _ = fetch_ollama_llm_models()
@@ -473,7 +490,8 @@ if task_option == "RAG System Evaluation":
             "Select an Ollama model", ollama_model_names, key="eval_ollama_llm_model"
         ) if ollama_model_names else None
 
-    if model_option == "Huggingface":
+    # Embedding model selection
+    if eval_model_provider == "Huggingface":
         if "hf_embedding_models" not in st.session_state:
             with st.spinner("Fetching Huggingface embedding models..."):
                 st.session_state.hf_embedding_models = fetch_huggingface_embedding_models()
@@ -481,7 +499,9 @@ if task_option == "RAG System Evaluation":
         embedding_model_name = st.sidebar.selectbox(
             "Select a Huggingface embedding model", embedding_models, key="eval_hf_embedding_model"
         ) if embedding_models else None
-    elif model_option == "Ollama":
+        if embedding_model_name:
+            embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
+    elif eval_model_provider == "Ollama":
         if "ollama_embedding_models" not in st.session_state:
             with st.spinner("Fetching Ollama embedding models..."):
                 embedding_models = fetch_ollama_embedding_models()
@@ -490,6 +510,8 @@ if task_option == "RAG System Evaluation":
         embedding_model_name = st.sidebar.selectbox(
             "Select an Ollama embedding model", ollama_embedding_models, key="eval_ollama_embedding_model"
         ) if ollama_embedding_models else None
+        if embedding_model_name:
+            embedding_model = OllamaEmbeddings(model=embedding_model_name)
 
     vector_db_option = st.sidebar.selectbox(
         "Select the vector database you want to use",
@@ -567,8 +589,7 @@ if task_option == "RAG System Evaluation":
             st.warning("Please select both a model and an embedding model.")
         else:
             chat_model = None
-            embedding_model = None
-            if model_option == "Huggingface" and llm_model_name:
+            if eval_model_provider == "Huggingface" and llm_model_name:
                 llm_pipeline = HuggingFacePipeline.from_model_id(
                     model_id=llm_model_name,
                     task="text-generation",
@@ -576,17 +597,19 @@ if task_option == "RAG System Evaluation":
                     device=0 if torch.cuda.is_available() else -1,
                 )
                 chat_model = ChatHuggingFace(llm=llm_pipeline)
-            elif model_option == "Ollama" and llm_model_name:
+            elif eval_model_provider == "Ollama" and llm_model_name:
                 chat_model = load_ollama_model(llm_model_name)
 
-            if model_option == "Huggingface" and embedding_model_name:
+            embedding_model = None
+            if eval_model_provider == "Huggingface" and embedding_model_name:
                 embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
-            elif model_option == "Ollama" and embedding_model_name:
-                embedding_model = embedding_model_name
+            elif eval_model_provider == "Ollama" and embedding_model_name:
+                embedding_model = OllamaEmbeddings(model=embedding_model_name)
 
+            # Now you can safely use embedding_model in perform_simple_rag
             result = perform_simple_rag(
                 llm=chat_model,
-                embedding=embedding_model_name,
+                embedding=embedding_model,
                 data=pdf_data,
                 query=eval_query,
                 splittertype=splitter_option,

@@ -2,6 +2,9 @@ from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTex
 from vector_databases.chroma import load_chroma_vectorstore
 from langchain.chains import RetrievalQA
 from langchain_core.documents import Document
+import shutil
+import os
+import uuid
 
 def perform_simple_rag(
         llm, 
@@ -12,6 +15,10 @@ def perform_simple_rag(
         chunk_size: int, 
         chunk_overlap: int,
     ):
+    # Use a unique persist directory for each run
+    persist_directory = f'./db/{uuid.uuid4()}'
+    os.makedirs(persist_directory, exist_ok=True)
+
     if splittertype == "Character Text Splitter":
         text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     elif splittertype == "Recursive Character Text Splitter":
@@ -29,7 +36,11 @@ def perform_simple_rag(
     texts = text_splitter.split_text(text)
     documents = [Document(page_content=t) for t in texts]
 
-    vector_store = load_chroma_vectorstore(collection_name="simple_rag_collection", model_name=embedding)
+    vector_store = load_chroma_vectorstore(
+        collection_name="simple_rag_collection",
+        embedding=embedding,
+        persist_directory=persist_directory
+    )
     vector_store.add_documents(documents)
     retriever = vector_store.as_retriever(search_kwargs={'k': 2})
 
