@@ -13,25 +13,14 @@ from tools.web_search import web_search_tool
 from rag_type.agentic_rag import create_agent, run_agent
 from utils.fetch_ollama_models import fetch_ollama_llm_models, fetch_ollama_embedding_models
 from providers.ollama import load_ollama_model
+from evals.evals import bleu_score, batch_bleu, bert_score
 
 st.title("Retrieval Augmented Generation Project")
 
 st.sidebar.title("Navigation")
 st.sidebar.write("Use the sidebar to navigate or set options.")
 
-task_option = st.sidebar.selectbox(
-    "Select a task to be performed on LLMs",
-    (
-        "Retrieval Augmented Generation",
-        "Fine Tuning",
-        "LLM inference optimization",
-        "Agentic AI",
-        "Multi agent use case",
-        "Knowledge Graph Visualization"
-    )
-)
-
-st.sidebar.subheader("Load Models")
+# Define model provider once at the top
 model_option = st.sidebar.selectbox(
     "Select a model provider",
     (
@@ -49,13 +38,26 @@ model_option = st.sidebar.selectbox(
     )
 )
 
+task_option = st.sidebar.selectbox(
+    "Select a task to be performed on LLMs",
+    (
+        "Retrieval Augmented Generation",
+        "Fine Tuning",
+        "LLM inference optimization",
+        "Agentic AI",
+        "RAG System Evaluation",
+        "Model Quantization",
+        "Multi agent use case",
+        "Knowledge Graph Visualization"
+    )
+)
+
+st.sidebar.subheader("Load Models")
 hf_model_name = None
 custom_hf_model_name = None
 show_custom_hf_input = False
-
 ollama_model_name = None
 ollama_embedding_model = None
-
 loaded_hf_model = None
 loaded_hf_tokenizer = None
 loaded_embedding_model = None
@@ -129,7 +131,6 @@ custom_embedding_model_name = None
 show_custom_embedding_input = False
 
 if task_option == "Retrieval Augmented Generation":
-
     data_option = st.sidebar.selectbox(
         "Select the type of data",
         (
@@ -156,6 +157,7 @@ if task_option == "Retrieval Augmented Generation":
         (
             "Simple RAG",
             "Graph RAG",
+            "Advanced RAG"
         )
     )
 
@@ -225,7 +227,6 @@ if task_option == "Retrieval Augmented Generation":
             if st.sidebar.button("Load Embedding Model"):
                 if isinstance(embedding_model_name, str) and embedding_model_name.strip():
                     with st.spinner(f"Loading Huggingface embedding model: {embedding_model_name} ..."):
-                        # loaded_embedding_model = load_huggingface_embedding(embedding_model_name)
                         loaded_embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
                     st.sidebar.success(f"Embedding model '{embedding_model_name}' loaded successfully!")
                 else:
@@ -335,7 +336,6 @@ if task_option == "Retrieval Augmented Generation":
     user_query = st.text_input("Enter your text query:", key="rag_query")
     if user_query:
         if rag_type_option == "Simple RAG":
-            # Initialize chat model and embedding model objects
             chat_model = None
             embedding_model = None
             if model_option == "Huggingface" and hf_model_name:
@@ -345,7 +345,6 @@ if task_option == "Retrieval Augmented Generation":
                     pipeline_kwargs={"max_new_tokens": 100},
                     device=0 if torch.cuda.is_available() else -1,
                 )
-                # Initialize ChatHuggingFace with the pipeline
                 chat_model = ChatHuggingFace(llm=llm_pipeline)
             if embedding_model_name:
                 embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
@@ -385,9 +384,7 @@ if task_option == "Agentic AI":
     st.sidebar.markdown("---")
     st.sidebar.subheader("Add Tool")
 
-    # Define available tools
     available_tools = ["Web Search"]
-
     selected_tool = st.sidebar.selectbox("Select Tool", available_tools, key="tool_select")
     tool_description = st.sidebar.text_area("Tool Description", key="tool_description")
 
@@ -451,3 +448,164 @@ if task_option == "Agentic AI":
 
 if task_option == "Knowledge Graph Visualization":
     pass
+
+if task_option == "RAG System Evaluation":
+    st.sidebar.subheader("RAG System Evaluation Configuration")
+
+    llm_model_name = None
+    embedding_model_name = None
+
+    if model_option == "Huggingface":
+        if "hf_model_names" not in st.session_state:
+            with st.spinner("Fetching Huggingface models..."):
+                st.session_state.hf_model_names = fetch_huggingface_models()
+        model_names = st.session_state.get("hf_model_names", [])
+        llm_model_name = st.sidebar.selectbox(
+            "Select a Huggingface model", model_names, key="eval_hf_llm_model"
+        ) if model_names else None
+    elif model_option == "Ollama":
+        if "ollama_model_names" not in st.session_state:
+            with st.spinner("Fetching Ollama models..."):
+                llm_models, _ = fetch_ollama_llm_models()
+                st.session_state.ollama_model_names = llm_models
+        ollama_model_names = st.session_state.get("ollama_model_names", [])
+        llm_model_name = st.sidebar.selectbox(
+            "Select an Ollama model", ollama_model_names, key="eval_ollama_llm_model"
+        ) if ollama_model_names else None
+
+    if model_option == "Huggingface":
+        if "hf_embedding_models" not in st.session_state:
+            with st.spinner("Fetching Huggingface embedding models..."):
+                st.session_state.hf_embedding_models = fetch_huggingface_embedding_models()
+        embedding_models = st.session_state.get("hf_embedding_models", [])
+        embedding_model_name = st.sidebar.selectbox(
+            "Select a Huggingface embedding model", embedding_models, key="eval_hf_embedding_model"
+        ) if embedding_models else None
+    elif model_option == "Ollama":
+        if "ollama_embedding_models" not in st.session_state:
+            with st.spinner("Fetching Ollama embedding models..."):
+                embedding_models = fetch_ollama_embedding_models()
+                st.session_state.ollama_embedding_models = embedding_models
+        ollama_embedding_models = st.session_state.get("ollama_embedding_models", [])
+        embedding_model_name = st.sidebar.selectbox(
+            "Select an Ollama embedding model", ollama_embedding_models, key="eval_ollama_embedding_model"
+        ) if ollama_embedding_models else None
+
+    vector_db_option = st.sidebar.selectbox(
+        "Select the vector database you want to use",
+        ("Qdrant", "Milvus", "Chroma", "FAISS"),
+        key="eval_vector_db"
+    )
+
+    splitter_option = st.sidebar.selectbox(
+        "Select Splitter Type",
+        ("Character Text Splitter", "Recursive Character Text Splitter"),
+        key="eval_splitter"
+    )
+
+    chunk_size = st.sidebar.number_input(
+        "Enter chunk size for RAG",
+        min_value=1,
+        max_value=10000,
+        value=1000,
+        step=1,
+        key="eval_chunk_size"
+    )
+    chunk_overlap = st.sidebar.number_input(
+        "Enter chunk overlap for RAG",
+        min_value=0,
+        max_value=10000,
+        value=200,
+        step=1,
+        key="eval_chunk_overlap"
+    )
+
+    available_metrics = [
+        "BLEU",
+        "BERTScore",
+        "Exact Match",
+        "F1",
+        "ROUGE-L",
+        "Precision@k",
+        "Context Precision@k"
+    ]
+    selected_metrics = st.sidebar.selectbox(
+        "Select Evaluation Metric",
+        available_metrics,
+        key="eval_metric"
+    )
+
+    st.markdown("### Enter your question")
+    eval_query = st.text_input("Evaluation Query", key="eval_query")
+
+    st.markdown("### Add Ground Truths (one per line)")
+    ground_truths_input = st.text_area("Ground Truths", placeholder="Enter each ground truth on a new line", key="eval_ground_truths")
+    ground_truths = [gt.strip() for gt in ground_truths_input.split('\n') if gt.strip()]
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Upload PDF File")
+    pdf_file = st.sidebar.file_uploader("Upload your PDF file", type=["pdf"], key="eval_pdf_file")
+    pdf_data = None
+    if pdf_file is not None:
+        st.write(f"PDF file upload: **{pdf_file.name}**")
+        with st.spinner("Loading PDF files..."):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                tmp_file.write(pdf_file.read())
+                tmp_file_path = tmp_file.name
+            pdf_data = load_pdf(tmp_file_path)
+        st.success("Successfully loaded PDF data")
+        st.write(pdf_data)
+
+    if st.button("Evaluate", key="eval_evaluate_btn"):
+        if not eval_query:
+            st.warning("Please enter a question in the Evaluation Query box.")
+        elif not ground_truths:
+            st.warning("Please enter at least one ground truth.")
+        elif not pdf_data:
+            st.warning("Please upload a PDF file for context.")
+        elif not llm_model_name or not embedding_model_name:
+            st.warning("Please select both a model and an embedding model.")
+        else:
+            chat_model = None
+            embedding_model = None
+            if model_option == "Huggingface" and llm_model_name:
+                llm_pipeline = HuggingFacePipeline.from_model_id(
+                    model_id=llm_model_name,
+                    task="text-generation",
+                    pipeline_kwargs={"max_new_tokens": 100},
+                    device=0 if torch.cuda.is_available() else -1,
+                )
+                chat_model = ChatHuggingFace(llm=llm_pipeline)
+            elif model_option == "Ollama" and llm_model_name:
+                chat_model = load_ollama_model(llm_model_name)
+
+            if model_option == "Huggingface" and embedding_model_name:
+                embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
+            elif model_option == "Ollama" and embedding_model_name:
+                embedding_model = embedding_model_name
+
+            result = perform_simple_rag(
+                llm=chat_model,
+                embedding=embedding_model_name,
+                data=pdf_data,
+                query=eval_query,
+                splittertype=splitter_option,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap
+            )
+            prediction = result.result
+
+            if selected_metrics == "BLEU":
+                score = batch_bleu([prediction], [ground_truths[0]])
+                st.success(f"BLEU Score: {score:.4f}")
+            elif selected_metrics == "BERTScore":
+                score = bert_score([prediction], [ground_truths[0]])
+                st.success(f"BERTScore Precision: {score['BERTScore_precision']:.4f}")
+                st.success(f"BERTScore Recall: {score['BERTScore_Recall']:.4f}")
+                st.success(f"BERTScore F1: {score['BERTScore_F1']:.4f}")
+
+            st.markdown("### Model Prediction")
+            st.write(prediction)
+            st.markdown("### Ground Truth(s)")
+            for gt in ground_truths:
+                st.write(gt)
