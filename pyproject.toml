@@ -10,6 +10,7 @@ dependencies = [
     "bitsandbytes>=0.46.0",
     "chromadb>=1.0.13",
     "dspy>=2.6.27",
+    "firecrawl-py>=2.14.0",
     "graphiti-core[groq]>=0.12.4",
     "httpx>=0.28.1",
     "langchain>=0.3.26",

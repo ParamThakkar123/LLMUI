@@ -15,7 +15,12 @@ from utils.fetch_ollama_models import fetch_ollama_llm_models, fetch_ollama_embe
 from providers.ollama import load_ollama_model
 from evals.evals import bleu_score, batch_bleu, bert_score
 from langgraph.checkpoint.memory import MemorySaver
+from visualization.kg_vis.knowledge_graph import build_kg
+from visualization.doc_hist.doc_histogram import show_hist
+from visualization.pacmap.pacmap import show_pacmap
+import asyncio
 from langchain_ollama import OllamaEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 st.title("Retrieval Augmented Generation Project")
 
@@ -50,7 +55,7 @@ task_option = st.sidebar.selectbox(
         "RAG System Evaluation",
         "Model Quantization",
         "Multi agent use case",
-        "Knowledge Graph Visualization"
+        "Visualization"
     )
 )
 
@@ -455,9 +460,6 @@ if task_option == "Agentic AI":
         else:
             st.warning("Please create an agent first using the sidebar options.")
 
-if task_option == "Knowledge Graph Visualization":
-    pass
-
 if task_option == "RAG System Evaluation":
     st.sidebar.subheader("RAG System Evaluation Configuration")
 
@@ -632,3 +634,109 @@ if task_option == "RAG System Evaluation":
             st.markdown("### Ground Truth(s)")
             for gt in ground_truths:
                 st.write(gt)
+
+if task_option == "Visualization":
+    visualization_type = st.sidebar.selectbox(
+        "Select Visualization Type",
+        ("Knowledge Graph", "Histogram", "Clustering", "PacMap"),
+        key="visualization_type"
+    )
+
+    if visualization_type == "Histogram":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Upload PDF File")
+        pdf_file = st.sidebar.file_uploader(
+            "Upload your PDF file for histogram",
+            type=["pdf"],
+            key="histogram_pdf_file"
+        )
+        if pdf_file is not None:
+            st.write(f"PDF file uploaded: **{pdf_file.name}**")
+            with st.spinner("Loading PDF file..."):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(pdf_file.read())
+                    tmp_file_path = tmp_file.name
+                from data_load.load_pdf import load_pdf
+                loaded_doc = load_pdf(tmp_file_path)
+            st.success("Successfully loaded PDF data")
+            st.write("Generating histogram...")
+            show_hist(loaded_doc)
+
+    if visualization_type == "Knowledge Graph":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Upload PDF File")
+        pdf_file = st.sidebar.file_uploader(
+            "Upload your PDF file for Knowledge Graph",
+            type=["pdf"],
+            key="kg_pdf_file"
+        )
+
+        llm_model_name = None
+        if model_option == "Huggingface":
+            if "hf_model_names" not in st.session_state:
+                with st.spinner("Fetching Huggingface models... "):
+                    st.session_state.hf_model_names = fetch_huggingface_models()
+            model_names = st.session_state.get("hf_model_names", [])
+            llm_model_name = st.sidebar.selectbox(
+                "Select a Huggingface model for KG", model_names, key="kg_hf_llm_model"
+            ) if model_names else None
+
+        elif model_option == "Ollama":
+            if "ollama_model_names" not in st.session_state:
+                with st.spinner("Fetching Ollama models..."):
+                    llm_models, _ = fetch_ollama_llm_models()
+                    st.session_state.ollama_model_names = llm_models
+            ollama_model_names = st.session_state.get("ollama_model_names", [])
+            llm_model_name = st.sidebar.selectbox(
+                "Select an Ollama model for KG", ollama_model_names, key="kg_ollama_llm_model"
+            ) if ollama_model_names else None
+
+        if pdf_file is not None and llm_model_name:
+            st.write(f"PDF file uploaded : **{pdf_file.name}**")
+            with st.spinner("Loading PDF file..."):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(pdf_file.read())
+                    tmp_file_path = tmp_file.name
+                loaded_doc = load_pdf(tmp_file_path)
+            st.success("Successfully loaded PDF data")
+            st.write("Building and displaying knowledge graph...")
+
+            if model_option == "Huggingface":
+                llm_pipeline = HuggingFacePipeline.from_model_id(
+                    model_id=llm_model_name,
+                    task="text-generation",
+                    pipeline_kwargs={"max_new_tokens": 100},
+                    device=0 if torch.cuda.is_available() else -1,
+                )
+                chat_model = ChatHuggingFace(llm=llm_pipeline)
+            elif model_option == "Ollama":
+                chat_model = load_ollama_model(llm_model_name)
+
+            asyncio.run(build_kg(chat_model, loaded_doc))
+
+    if visualization_type == "PacMap":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Upload PDF File")
+        pdf_file = st.sidebar.file_uploader(
+            "Upload your PDF file for PaCMAP",
+            type=["pdf"],
+            key="pacmap_pdf_file"
+        )
+        if pdf_file is not None:
+            st.write(f"PDF file uploaded: **{pdf_file.name}**")
+            with st.spinner("Loading PDF file..."):
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                    tmp_file.write(pdf_file.read())
+                    tmp_file_path = tmp_file.name
+                from data_load.load_pdf import load_pdf
+                loaded_doc = load_pdf(tmp_file_path)
+            st.success("Successfully loaded PDF data")
+            st.write("Generating chunk embeddings and projecting with PaCMAP...")
+
+            embedding_model = HuggingFaceEmbeddings(model_name="thenlper/gte-small")
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            texts = [doc.page_content for doc in loaded_doc]
+            chunks = text_splitter.create_documents(texts)
+            chunk_texts = [doc.page_content for doc in chunks]
+            embeddings = embedding_model.embed_documents(chunk_texts)
+            show_pacmap(embeddings, title="PaCMAP 2D Projection of PDF Chunk Embeddings")

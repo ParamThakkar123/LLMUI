@@ -610,6 +610,23 @@ wheels = [
 ]
 
 [[package]]
+name = "firecrawl-py"
+version = "2.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "nest-asyncio" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "requests" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/bd/38bc6492758b2e4d47225e47e8a05ae4740f5140ded096ffa88975fe785b/firecrawl_py-2.14.0.tar.gz", hash = "sha256:85bb0151704885fe9f0003dc134ac728dede32e7c22f60dadc49a8187c5c5b42", size = 39908 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/35/d1d9430ebc8973b4fdb858656b4e04127c6afab7ce22eb2a42d9c16954ce/firecrawl_py-2.14.0-py3-none-any.whl", hash = "sha256:d8692d4d27e5446b469a4c2530e1cbd82d34212ada598add7ae0679e7b93b00f", size = 75540 },
+]
+
+[[package]]
 name = "flatbuffers"
 version = "25.2.10"
 source = { registry = "https://pypi.org/simple" }
@@ -1488,6 +1505,7 @@ dependencies = [
     { name = "bitsandbytes" },
     { name = "chromadb" },
     { name = "dspy" },
+    { name = "firecrawl-py" },
     { name = "graphiti-core", extra = ["groq"] },
     { name = "httpx" },
     { name = "langchain" },
@@ -1524,6 +1542,7 @@ requires-dist = [
     { name = "bitsandbytes", specifier = ">=0.46.0" },
     { name = "chromadb", specifier = ">=1.0.13" },
     { name = "dspy", specifier = ">=2.6.27" },
+    { name = "firecrawl-py", specifier = ">=2.14.0" },
     { name = "graphiti-core", extras = ["groq"], specifier = ">=0.12.4" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain", specifier = ">=0.3.26" },
@@ -1830,6 +1849,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7c/5a/b9309d488b7cfe63326b6502b12dfae16558d64ead4d007b5e6392dd36ac/neo4j_graphrag-1.7.0.tar.gz", hash = "sha256:c6c1f730e680d8af3ff3e1ee6086c465c15dd3245157e6c40606ac3ddae7d4f0", size = 104306 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/98/2a/b9e29d7a1068302f94dc05d682f1068795947f6c0a99d8274e7f1ca29d23/neo4j_graphrag-1.7.0-py3-none-any.whl", hash = "sha256:29a854f2f1e268f043446cdd387c72ee954b87726329ef6479c59ed7b9cf0751", size = 180365 },
+]
+
+[[package]]
+name = "nest-asyncio"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/83/f8/51569ac65d696c8ecbee95938f89d4abf00f47d58d48f6fbabfe8f0baefe/nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe", size = 7418 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/c4/c2971a3ba4c6103a3d10c4b0f24f461ddc027f0f09763220cf35ca1401b3/nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c", size = 5195 },
 ]
 
 [[package]]
