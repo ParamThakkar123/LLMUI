@@ -8,6 +8,7 @@ import torch
 from langchain_huggingface.chat_models import ChatHuggingFace
 from langchain_huggingface import HuggingFacePipeline
 from tools.web_search import web_search_tool
+from tools.web_crawl_tool import web_crawl_tool
 from rag_type.agentic_rag import create_agent, run_agent
 from utils.fetch_ollama_models import fetch_ollama_llm_models, fetch_ollama_embedding_models
 from providers.ollama import load_ollama_model
@@ -541,6 +542,38 @@ if task_option == "Fine Tuning":
 if task_option == "Agentic AI":
     st.sidebar.subheader("Agentic AI Configuration")
 
+    model_option = st.sidebar.selectbox(
+        "Select a model provider",
+        ("Huggingface", "Ollama"),
+        key="agentic_model_provider"
+    )
+
+    hf_model_name = None
+    ollama_model_name = None
+
+    if model_option == "Huggingface":
+        if "hf_model_names" not in st.session_state:
+            with st.spinner("Fetching Huggingface models..."):
+                st.session_state.hf_model_names = fetch_huggingface_models()
+        model_names = st.session_state.get("hf_model_names", [])
+        hf_model_name = st.sidebar.selectbox(
+            "Select a Huggingface model",
+            model_names,
+            key="agentic_hf_model"
+        ) if model_names else None
+
+    elif model_option == "Ollama":
+        if "ollama_model_names" not in st.session_state:
+            with st.spinner("Fetching Ollama models..."):
+                llm_models, _ = fetch_ollama_llm_models()
+                st.session_state.ollama_model_names = llm_models
+        ollama_model_names = st.session_state.get("ollama_model_names", [])
+        ollama_model_name = st.sidebar.selectbox(
+            "Select an Ollama Model",
+            ollama_model_names,
+            key="agentic_ollama_model"
+        ) if ollama_model_names else None
+
     agent_name = st.sidebar.text_input(
         "Enter the name of the agent",
         value="Agent"
@@ -554,7 +587,7 @@ if task_option == "Agentic AI":
     st.sidebar.markdown("---")
     st.sidebar.subheader("Add Tool")
 
-    available_tools = ["Web Search"]
+    available_tools = ["Web Search", "Web Crawl Tool"]
     selected_tool = st.sidebar.selectbox("Select Tool", available_tools, key="tool_select")
     tool_description = st.sidebar.text_area("Tool Description", key="tool_description")
 
@@ -573,6 +606,9 @@ if task_option == "Agentic AI":
                 else:
                     st.session_state.agent_tools.append(web_search_tool(serper_api_key=serper_api_key))
                     st.sidebar.success(f"Tool {selected_tool} Added")
+            elif selected_tool.lower() == "web crawl tool":
+                st.session_state.agent_tools.append(web_crawl_tool)
+                st.sidebar.success(f"Tool {selected_tool} Added")
             else:
                 st.session_state.agent_tools.append({
                     "name": selected_tool,
@@ -592,6 +628,7 @@ if task_option == "Agentic AI":
             model_id = None
         model_provider = model_option.lower()
         tools = st.session_state.agent_tools
+        print(tools)
         if not model_id:
             st.sidebar.error("Please select a model for the agent.")
         elif not prompt:
@@ -604,6 +641,7 @@ if task_option == "Agentic AI":
                 prompt=prompt
             )
             st.session_state.agent = agent
+            print(agent)
             st.success("Agent created successfully!")
 
     st.markdown("---")
@@ -612,6 +650,7 @@ if task_option == "Agentic AI":
         agent = st.session_state.get("agent", None)
         if agent is not None:
             response = run_agent(agent, agent_query)
-            st.write(response.content)
+            st.write(response)
+            st.write(response['messages'][-1].content)
         else:
             st.warning("Please create an agent first using the sidebar options.")

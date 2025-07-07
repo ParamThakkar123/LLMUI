@@ -1,11 +1,6 @@
-from langchain_core.tools import StructuredTool
-from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs, unquote
-
-class CrawlInput(BaseModel):
-    query: str
 
 def crawl_web(query: str) -> str:
     """
@@ -48,9 +43,4 @@ def crawl_web(query: str) -> str:
 
     return "No accessible content found from the search results."
 
-web_crawl_tool = StructuredTool.from_function(
-    name="Web Crawl Tool",
-    description="Crawls the web for a given query and returns the content of the top search result.",
-    func=crawl_web,
-    args_schema=CrawlInput
-)
+print(crawl_web("What is share price of Nvidia on 7th July 2025 ?"))

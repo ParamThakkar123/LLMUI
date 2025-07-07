@@ -8,7 +8,7 @@ class SearchInput(BaseModel):
 def web_search_tool(serper_api_key: str) -> StructuredTool:
     search = GoogleSerperAPIWrapper(serper_api_key=serper_api_key)
     def answer(query: str) -> str:
-        search.run(query)
+        return search.run(query)
     
     tool = StructuredTool.from_function(
         name="Web Search Tool",
