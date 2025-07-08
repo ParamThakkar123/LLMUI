@@ -17,6 +17,7 @@ from visualization.kg_vis.knowledge_graph import build_kg
 from visualization.doc_hist.doc_histogram import show_hist
 from visualization.pacmap.pacmap import show_pacmap
 import asyncio
+from benchmarking.dataset_benchmarking import dataset_benchmarking
 from langchain_ollama import OllamaEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -34,6 +35,7 @@ task_option = st.sidebar.selectbox(
         "RAG System Benchmarking",
         "Model Quantization",
         "Multi agent use case",
+        "Dataset Benchmarking",
         "Visualization"
     )
 )
@@ -654,3 +656,71 @@ if task_option == "Agentic AI":
             st.write(response['messages'][-1].content)
         else:
             st.warning("Please create an agent first using the sidebar options.")
+
+if task_option == "Dataset Benchmarking":
+    model_option = st.sidebar.selectbox(
+        "Select a model provider",
+        ("Huggingface", "Ollama"),
+        key="agentic_model_provider"
+    )
+
+    hf_model_name = None
+    ollama_model_name = None
+
+    if model_option == "Huggingface":
+        if "hf_model_names" not in st.session_state:
+            with st.spinner("Fetching Huggingface models..."):
+                st.session_state.hf_model_names = fetch_huggingface_models()
+        model_names = st.session_state.get("hf_model_names", [])
+        hf_model_name = st.sidebar.selectbox(
+            "Select a Huggingface model",
+            model_names,
+            key="agentic_hf_model"
+        ) if model_names else None
+
+    elif model_option == "Ollama":
+        if "ollama_model_names" not in st.session_state:
+            with st.spinner("Fetching Ollama models..."):
+                llm_models, _ = fetch_ollama_llm_models()
+                st.session_state.ollama_model_names = llm_models
+        ollama_model_names = st.session_state.get("ollama_model_names", [])
+        ollama_model_name = st.sidebar.selectbox(
+            "Select an Ollama Model",
+            ollama_model_names,
+            key="agentic_ollama_model"
+        ) if ollama_model_names else None
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("Upload Excel Dataset")
+    excel_file = st.sidebar.file_uploader(
+        "Upload your Excel file (must have 'Question' and 'Answer' columns)",
+        type=["xlsx", "xls"],
+        key="benchmark_excel_file"
+    )
+
+    # Add a button to load the model
+    if st.sidebar.button("Load Model"):
+        llm_model = None
+        if model_option == "Huggingface" and hf_model_name:
+            llm_pipeline = HuggingFacePipeline.from_model_id(
+                model_id=hf_model_name,
+                task="text-generation",
+                pipeline_kwargs={"max_new_tokens": 100},
+                device=0 if torch.cuda.is_available() else -1,
+            )
+            llm_model = ChatHuggingFace(llm=llm_pipeline)
+        elif model_option == "Ollama" and ollama_model_name:
+            llm_model = load_ollama_model(ollama_model_name)
+        st.session_state.llm_model = llm_model
+        st.success("Model loaded successfully!")
+
+    # Only run benchmarking if both file and model are loaded
+    llm_model = st.session_state.get("llm_model", None)
+    if excel_file is not None and llm_model is not None:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_file:
+            tmp_file.write(excel_file.read())
+            tmp_file_path = tmp_file.name
+        st.success(f"Excel file uploaded: {excel_file.name}")
+        dataset_benchmarking(tmp_file_path, llm_model)
+    elif excel_file is not None and llm_model is None:
+        st.warning("Please load a model before benchmarking.")
