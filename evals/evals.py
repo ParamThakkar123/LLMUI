@@ -1,7 +1,11 @@
 from bert_score import score
 from rouge_score import rouge_scorer
 from collections import Counter
+import torch
+from transformers import AutoTokenizer, AutoModelWithLMHead
 import Levenshtein
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def simple_tokenize(text):
     import re
@@ -139,3 +143,20 @@ def levenshtein_distance(predictions, ground_truth):
         else:
             distances.append(Levenshtein.distance(pred, gt) / max(len(pred), len(gt)))
     return sum(distances) / len(distances) if distances else 0.0
+
+def perplexity_score(predictions, model_name="gpt2"):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelWithLMHead.from_pretrained(model_name).to(device)
+    model.eval()
+
+    perplexities = []
+    for pred in predictions:
+        inputs = tokenizer(pred, return_tensors="pt")
+        input_ids = inputs["input_ids"].to(device)
+        with torch.no_grad():
+            outputs = model(input_ids, labels=input_ids)
+            loss = outputs.loss
+            ppl = torch.exp(loss).item()
+            perplexities.append(ppl)
+    return sum(perplexities) / len(perplexities) if perplexities else float("inf")

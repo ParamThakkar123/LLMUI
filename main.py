@@ -540,6 +540,18 @@ if task_option == "Fine Tuning":
     if fine_tune_dataset is not None:
         st.write(f"Fine tuning dataset uploaded: **{fine_tune_dataset.name}**")
 
+    fine_tuning_method = st.selectbox(
+        "Select fine tuning method",
+        [
+            "LoRA",
+            "Peft",
+            "QLoRA",
+            "GRPO",   
+            "SFT",
+            "RLHF"
+        ]
+    )
+
 # --- Agentic AI ---
 if task_option == "Agentic AI":
     st.sidebar.subheader("Agentic AI Configuration")
