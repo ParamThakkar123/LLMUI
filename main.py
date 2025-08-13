@@ -11,6 +11,7 @@ from tools.web_search import web_search_tool
 from tools.web_crawl_tool import web_crawl_tool
 from rag_type.agentic_rag import create_agent, run_agent
 from utils.fetch_ollama_models import fetch_ollama_llm_models, fetch_ollama_embedding_models
+from providers.huggingface import load_huggingface_model
 from providers.ollama import load_ollama_model
 from evals.evals import batch_bleu, bert_score, exact_match, f1, rouge_l, precision_at_k, recall_at_k
 from visualization.kg_vis.knowledge_graph import build_kg
@@ -39,6 +40,21 @@ task_option = st.sidebar.selectbox(
         "Visualization"
     )
 )
+
+def get_llm_model(provider, model_name):
+    """
+    Loads and returns the LLM model and tokenizer (if available) for the given provider and model name.
+    """
+    if provider.lower() == "huggingface" and model_name:
+        tokenizer, model = load_huggingface_model(model_name)
+        print(model)
+        return model, tokenizer
+    elif provider.lower() == "ollama" and model_name:
+        model = load_ollama_model(model_name)
+        print(model)
+        return model, None
+    else:
+        return None, None
 
 # --- Retrieval Augmented Generation ---
 if task_option == "Retrieval Augmented Generation":
