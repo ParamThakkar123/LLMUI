@@ -170,7 +170,7 @@ def dataset_benchmarking(excel_path, llm_model):
             "TPS per User", "Inter-token Latency"
         ]
         valid_metrics = [m for m in metrics_to_plot if m in metrics_df.columns]
-        metrics_df.plot(kind='bar', ax=valid_metrics, ax=ax)
+        metrics_df[valid_metrics].plot(kind='bar', ax=ax)
         ax.set_xlabel("Sample Index")
         ax.set_ylabel("Score")
         ax.set_title("Evaluation Metrics for Sample")

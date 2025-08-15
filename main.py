@@ -20,6 +20,7 @@ from visualization.pacmap.pacmap import show_pacmap
 import asyncio
 from benchmarking.dataset_benchmarking import dataset_benchmarking
 from langchain_ollama import OllamaEmbeddings
+from visualization.model_structure.display_model_structure import display_model_structure
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 st.title("Retrieval Augmented Generation Project")
@@ -443,8 +444,20 @@ if task_option == "RAG System Benchmarking":
 if task_option == "Visualization":
     visualization_type = st.sidebar.selectbox(
         "Select Visualization Type",
-        ("Knowledge Graph", "Histogram", "Clustering", "PacMap"),
+        (
+            "Knowledge Graph",
+            "Histogram",
+            "Clustering",
+            "PacMap",
+            "Model Structure"
+        ),
         key="visualization_type"
+    )
+
+    model_option = st.sidebar.selectbox(
+        "Select a model provider",
+        ("Huggingface", "Ollama"),
+        key="visualization_model_provider"
     )
 
     if visualization_type == "Histogram":
@@ -545,6 +558,31 @@ if task_option == "Visualization":
             chunk_texts = [doc.page_content for doc in chunks]
             embeddings = embedding_model.embed_documents(chunk_texts)
             show_pacmap(embeddings, title="PaCMAP 2D Projection of PDF Chunk Embeddings")
+
+    if visualization_type == "Model Structure":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("Select Huggingface Model for Structure Visualization")
+        model_name = None
+        if model_option == "Huggingface":
+            if "hf_model_names" not in st.session_state:
+                with st.spinner("Fetching Huggingface models..."):
+                    st.session_state.hf_model_names = fetch_huggingface_models()
+            model_names = st.session_state.get("hf_model_names", [])
+            model_name = st.sidebar.selectbox(
+                "Select a Huggingface model for structure",
+                model_names,
+                key="structure_hf_model"
+            ) if model_names else None
+
+            if st.button("Display Model Structure"):
+                if model_name:
+                    tokenizer, model = load_huggingface_model(model_name)
+                    st.success(f"Model {model_name} loaded for structure visualization.")
+                    display_model_structure(model)
+                else:
+                    st.warning("Please select a Huggingface model to display its structure.")
+        else:
+            st.info("Model Structure visualization is only available for Huggingface models.")
 
 # --- Fine Tuning ---
 if task_option == "Fine Tuning":
