@@ -47,3 +47,18 @@ dependencies = [
     "trl>=0.19.1",
     "unstructured>=0.18.3",
 ]
+
+[tool.setuptools.packages.find]
+include = [
+    "lib",
+    "evals",
+    "rag_type",
+    "data_load",
+    "providers",
+    "fine_tuning",
+    "benchmarking",
+    "quantization",
+    "visualization",
+    "vector_databases",
+    "inference_optimization"
+]
